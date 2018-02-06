@@ -6,6 +6,7 @@ var morgan = require('morgan')
 const cors = require('cors')
 
 
+
 // const logger = (request, response, next) => {
 //    console.log('Method:',request.method)
 //    console.log('Path:  ', request.path)
@@ -19,6 +20,8 @@ morgan.token('resdata', function (req, res) {
    return JSON.stringify(req.body)
 })
 
+
+app.use(express.static('build'))
 app.use(cors())
 app.use(bodyParser.json())
 app.use(morgan(':method :url :resdata :status :res[content-length] - :response-time ms'))

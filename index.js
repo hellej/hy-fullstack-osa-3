@@ -4,8 +4,7 @@ const app = express()
 var bodyParser = require('body-parser')
 var morgan = require('morgan')
 const cors = require('cors')
-
-
+const Person = require('./models/person')
 
 // const logger = (request, response, next) => {
 //    console.log('Method:',request.method)
@@ -25,6 +24,15 @@ app.use(express.static('build'))
 app.use(cors())
 app.use(bodyParser.json())
 app.use(morgan(':method :url :resdata :status :res[content-length] - :response-time ms'))
+
+
+const formatPerson = (person) => {
+   return {
+      name: person.name,
+      number: person.number,
+      id: person._id
+   }
+}
 
 
 let persons = [
@@ -52,9 +60,21 @@ let persons = [
 
 
 
-app.get('/info', (request, response) => {
-   response.send(`<p>Puhelinluettelossa on ${persons.length} henkilön tiedot </p>
-   <p> ${new Date()} </p>`)
+app.get('/api/info', (request, response) => {
+   let length = null
+
+   Person
+      .find({})
+      .then(persons => {
+         length = persons.length
+         console.log("Length: ", length)
+         response.send(`<p>Puhelinluettelossa on ${length} henkilön tiedot </p>
+         <p> ${new Date()} </p>`)
+      })
+      .catch(error => {
+         console.log(error)
+         response.status(400).send({ error: error })
+      })
 })
 
 app.get('/api', (request, response) => {
@@ -62,40 +82,110 @@ app.get('/api', (request, response) => {
 })
 
 app.get('/api/persons', (requestreq, response) => {
-   response.json(persons)
+   Person
+      .find({})
+      .then(persons => {
+         response.json(persons.map(Person.format))
+      })
+      .catch(error => {
+         console.log(error)
+         response.status(400).send({ error: error })
+      })
 })
 
+
 app.get('/api/persons/:id', (request, response) => {
+
    const id = Number(request.params.id)
    const person = persons.find(person => person.id === id)
 
-   if (person) {
-      response.json(person)
-   } else {
-      response.status(404).end()
-   }
+   Person
+      .findById(request.params.id)
+      .then(Person.format)
+      .then(foundperson => {
+         if (foundperson) {
+            response.json(foundperson)
+         } else { response.status(404).send({ error: "no person found" }) }
+      })
+      .catch(error => {
+         console.log(error)
+         response.status(400).send({ error: 'malformatted id' })
+      })
 })
+
+app.put('/api/persons/:id', (request, response) => {
+
+   const person = {
+      name: request.body.name,
+      number: request.body.number
+   }
+
+   Person
+      .findByIdAndUpdate(request.params.id, person, { new: true })
+      .then(Person.format)
+      .then(updatedperson => {
+         response.json((updatedperson))
+      })
+      .catch(error => {
+         console.log(error)
+         response.status(400).send({ error: error })
+      })
+
+})
+
 
 app.delete('/api/persons/:id', (request, response) => {
    const id = Number(request.params.id)
-   persons = persons.filter(person => person.id !== id)
+   // persons = persons.filter(person => person.id !== id)
 
-   response.status(204).end()
+   Person
+      .findByIdAndRemove(request.params.id)
+      .then(result => {
+         response.status(204).end()
+      })
+      .catch(error => {
+         console.log(error)
+         response.status(400).send({ error: 'malformatted id' })
+      })
+
 })
 
 app.post('/api/persons', (request, response) => {
-   const person = request.body
-   const name = person.name
-   person.id = Math.floor(Math.random() * 10000)
 
-   const existingperson = persons.find(person => person.name === name)
-   if (existingperson) {
-      response.status(400).json({ error: 'Name already in list' })
-   } else if (person.name === '' || person.number === '') {
-      response.status(400).json({ error: 'Name or number missing' })
-   } else {
-      response.json(person)
-   }
+   Person
+      .findOne({ name: request.body.name })
+      .then(existingperson => {
+         if (existingperson) {
+            console.log("Person exists: ", existingperson)
+            response.status(404).send({ error: "Name already exists in phonebook" })
+         } else {
+            console.log("Person doesn't exist")
+            const person = new Person({
+               name: request.body.name,
+               number: request.body.number
+            })
+            person
+               .save()
+               .then(Person.format)
+               .then(savedperson => {
+                  console.log('Person saved')
+                  response.json(savedperson)
+               })
+               .catch(error => {
+                  console.log(error)
+                  response.status(400).send({ error: error })
+               })
+         }
+      })
+      .catch(error => {
+         console.log(error)
+         response.status(400).send({ error: error })
+      })
+
+
+
+   // response.json(Person.format(person))
+
 })
 
 
